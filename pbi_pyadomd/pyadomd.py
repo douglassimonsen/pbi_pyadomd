@@ -23,7 +23,7 @@ import structlog
 
 from .c_sharp_type_mapping import adomd_type_map, convert
 from .Microsoft.AnalysisServices.enums import ConnectionState
-
+from . import utils
 logger = structlog.get_logger()
 T = TypeVar("T")
 
@@ -106,9 +106,13 @@ class Cursor:
 
     def __init__(self, connection: AdomdConnection) -> None:
         self._conn = connection
-        self._description: list[Description] = []
 
     def close(self) -> None:
+        """Closes the underlying reader of the cursor.
+        
+        Note:
+            If the reader is already closed or has not been initialized, this method does nothing.
+        """
         if self.is_closed:
             return
         self._reader.close()
@@ -116,21 +120,6 @@ class Cursor:
     def execute_xml(
         self, query: str, query_name: str | None = None,
     ) -> bs4.BeautifulSoup:
-        def _is_encoded_char(val: str) -> bool:
-            UTF_ENCODED_LEN = 5  # noqa: N806
-            start, body = val[0], val[1:]
-            return (
-                len(val) == UTF_ENCODED_LEN
-                and start == "x"
-                and all(c in "0123456789ABCDEF" for c in body)
-            )
-
-        def _clean_name(name: str) -> str:
-            name_parts = name.split("_")
-            for i, e in enumerate(name_parts):
-                if _is_encoded_char(e):
-                    name_parts[i] = chr(int(e[1:], 16))
-            return "_".join(name_parts)
 
         query_name = query_name or ""
         logger.debug("execute XML query", query_name=query_name)
@@ -143,7 +132,7 @@ class Cursor:
         ret = bs4.BeautifulSoup("".join(lines), "xml")
         for node in ret.find_all():
             assert isinstance(node, bs4.element.Tag)
-            node.name = _clean_name(node.name)
+            node.name = utils._decode_name(node.name)
         return ret
 
     def execute_non_query(self, query: str, query_name: str | None = None) -> Self:
@@ -172,8 +161,12 @@ class Cursor:
 
         Note:
         ----
-            This is important for subscribe queries that return a stream of data.
+            You may need to close the reader after fetching the rows if:
 
+            1. You are using a explicit limit that is shorter than the total number of rows in the query result
+            2. You are tracing the command associated with the reader
+
+            This is because the trace will not create a query end record (since it assumes the client is still reading) without explicitly closing the reader. The reader can be closed with `self._reader.Close()`
         """
         column_names = self.column_names()
         while self._reader.read():
@@ -216,15 +209,15 @@ class Cursor:
 
     @property
     def is_closed(self) -> bool:
+        """Checks if the underlying reader is closed.
+        
+        Note:
+            If the reader has not be initialized, it is considered closed."""
         try:
             state: bool = self._reader.is_closed
         except AttributeError:
             return True
         return state
-
-    @property
-    def description(self) -> list[Description]:
-        return self._description
 
     def __enter__(self) -> Self:
         return self
