@@ -14,41 +14,48 @@ limitations under the License.
 # mypy: ignore-errors
 from pathlib import Path
 from sys import path
-from typing import TYPE_CHECKING, Self, TypeVar
+from typing import TYPE_CHECKING, Self
 
+import bs4
 import clr  # type: ignore[import-untyped]
 import structlog
 
-from .cursor import Cursor
+from . import utils
 from .Microsoft.AnalysisServices.enums import ConnectionState
+from .reader import Reader
 
 logger = structlog.get_logger()
-T = TypeVar("T")
 
 
 path.append(str(Path(__file__).parent)[2:])
 clr.AddReference("Microsoft.AnalysisServices.AdomdClient")  # pyright: ignore reportAttributeAccessIssue
 from Microsoft.AnalysisServices.AdomdClient import (  # noqa: E402
+    AdomdCommand,
     AdomdConnection,
     AdomdErrorResponseException,
 )
 
 __all__ = [
     "AdomdErrorResponseException",
-    "Conn",
+    "Connection",
 ]  # needed to keep ruff from cleaning up the exception
 
 if TYPE_CHECKING:
     from types import TracebackType
 
 
-class Conn:
+class Connection:
+    conn: AdomdConnection
+    """The underlying C# AdomdConnection object."""
+    reader: Reader
+    """The python reader for the connection, used to execute queries."""
+
     def __init__(self, conn_str: str) -> None:
         self.conn = AdomdConnection(conn_str)
 
-    def clone(self) -> "Conn":
+    def clone(self) -> "Connection":
         """Clones the connection."""
-        return Conn(self.conn.ConnectionString)
+        return Connection(self.conn.ConnectionString)
 
     def close(self) -> None:
         """Closes the connection."""
@@ -59,10 +66,6 @@ class Conn:
         """Opens the connection."""
         self.conn.Open()
         return self
-
-    def cursor(self) -> Cursor:
-        """Creates a cursor object."""
-        return Cursor(self.conn)
 
     @property
     def state(self) -> ConnectionState:
@@ -81,3 +84,42 @@ class Conn:
         traceback: "TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
+
+    def execute_xml(
+        self,
+        query: str,
+        query_name: str | None = None,
+    ) -> bs4.BeautifulSoup:
+        query_name = query_name or ""
+        logger.debug("execute XML query", query_name=query_name)
+        cmd = AdomdCommand(query, self.conn)
+
+        with Reader(cmd.ExecuteXmlReader()) as reader:
+            logger.debug("reading query", query_name=query_name)
+            lines = [reader.read_outer_xml()]
+            while lines[-1] != "":
+                lines.append(reader.read_outer_xml())
+            ret = bs4.BeautifulSoup("".join(lines), "xml")
+            for node in ret.find_all():
+                assert isinstance(node, bs4.element.Tag)
+                node.name = utils._decode_name(node.name)
+
+        return ret
+
+    def execute_non_query(self, query: str, query_name: str | None = None) -> Self:
+        query_name = query_name or ""
+        logger.debug("execute DAX query", query_name=query_name)
+        cmd = AdomdCommand(query, self.conn)
+        cmd.ExecuteNonQuery()
+        return self
+
+    def execute_dax(self, query: str, query_name: str | None = None) -> Reader:
+        query_name = query_name or ""
+        logger.debug("execute DAX query", query_name=query_name)
+        cmd = AdomdCommand(query, self.conn)
+        return Reader(cmd.ExecuteReader())
+
+
+def connect(conn_str: str) -> Connection:
+    """Connects to the given connection string."""
+    return Connection(conn_str)
