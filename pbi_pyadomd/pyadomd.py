@@ -114,18 +114,16 @@ class Cursor:
         self.reader.close()
 
     def execute_xml(
-        self, query: str, query_name: str | None = None
+        self, query: str, query_name: str | None = None,
     ) -> bs4.BeautifulSoup:
         def _is_encoded_char(val: str) -> bool:
             UTF_ENCODED_LEN = 5  # noqa: N806
             start, body = val[0], val[1:]
-            if (
+            return (
                 len(val) == UTF_ENCODED_LEN
                 and start == "x"
                 and all(c in "0123456789ABCDEF" for c in body)
-            ):
-                return True
-            return False
+            )
 
         def _clean_name(name: str) -> str:
             name_parts = name.split("_")
@@ -140,7 +138,7 @@ class Cursor:
         self.reader = Reader(self._cmd.ExecuteXmlReader())
         logger.debug("reading query", query_name=query_name)
         lines = [self.reader.read_outer_xml()]
-        while lines[-1] != "":  # noqa: PLC1901
+        while lines[-1] != "":
             lines.append(self.reader.read_outer_xml())
         ret = bs4.BeautifulSoup("".join(lines), "xml")
         for node in ret.find_all():
@@ -174,27 +172,47 @@ class Cursor:
 
         Note:
         ----
-            This is important for subscribe queries that return a stream of data."""
+            This is important for subscribe queries that return a stream of data.
+
+        """
         column_names = self.column_names()
         while self.reader.read():
-            yield dict(zip(column_names, self.fetch_one_tuple()))
+            yield dict(zip(column_names, self.fetch_one_tuple(), strict=False))
 
     def fetch_one_tuple(self) -> tuple[Any, ...]:
-        """Fetches a single row from the last executed query as a tuple. Used internally for performance."""
+        """Fetches a single row from the last executed query as a tuple.
+
+        Note:
+            Used internally for performance.
+
+        """
         return self.reader.get_row()
 
     def fetch_one(self) -> dict[str, Any]:
+        """Fetches a single row from the last executed query as a dictionary.
+
+        Returns:
+            dict[str, Any]: A dictionary representing the row, with column names as keys
+
+        """
         column_names = self.column_names()
         data = self.reader.get_row()
-        return dict(zip(column_names, data))
+        return dict(zip(column_names, data, strict=False))
 
-    def fetch_all(self, limit: int | None = None) -> list[dict[str, Any]]:
-        """Fetches all the rows from the last executed query."""
+    def fetch_many(self, limit: int | None = None) -> list[dict[str, Any]]:
+        """Fetches multiple rows from the last executed query.
+
+        Args:
+            limit (int | None): The number of rows to fetch. If None, fetches all rows.
+
+        Returns:
+            list[dict[str, Any]]: A list of dictionaries representing the rows.
+
+        """
         # mypy issues with list comprehension :-(
         if limit is not None:
             return [self.fetch_one() for _ in range(limit) if self.reader.read()]
-        else:
-            return list(self.fetch_stream())
+        return list(self.fetch_stream())
 
     @property
     def is_closed(self) -> bool:

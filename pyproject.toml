@@ -10,7 +10,7 @@ requires-python = ">=3.11.0"
 dynamic = ["version"]
 dependencies = [
   "pythonnet>=3.0.0",
-  "structlog",
+  "structlog>=25.4.0",
 ]
 
 [project.optional-dependencies]
@@ -23,3 +23,32 @@ file-encoding = "utf8"
 
 [tool.hatch.version]
 path = "pbi_pyadomd/__init__.py"
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  "ANN401",  # https://docs.astral.sh/ruff/rules/any-type/
+  "CPY001",  # https://docs.astral.sh/ruff/rules/missing-copyright-notice/
+  "DOC201",  # https://docs.astral.sh/ruff/rules/docstring-missing-returns/
+  "D100",    # https://docs.astral.sh/ruff/rules/undocumented-public-module/
+  "D401",    # https://docs.astral.sh/ruff/rules/non-imperative-mood/
+  "ERA001",  # https://docs.astral.sh/ruff/rules/commented-out-code/
+  "N815",    # https://docs.astral.sh/ruff/rules/mixed-case-variable-in-class-scope/ ignored for now. Can be undone by replacing the pydantic fields with Field(alias=...)
+  "PLR1722", # https://docs.astral.sh/ruff/rules/sys-exit-alias/
+  "RUF012",
+  "SLF001",  # https://docs.astral.sh/ruff/rules/private-member-access/
+  "S101",
+  "T100",    # https://docs.astral.sh/ruff/rules/debugger/
+  "T201",    # https://docs.astral.sh/ruff/rules/print/
+  "TD002",
+  "TD003",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  "D105",
+  "D107",
+  "FIX002",
+  "D203",
+  "D213",
+]

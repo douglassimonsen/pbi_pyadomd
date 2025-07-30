@@ -46,7 +46,9 @@ class CDatetime:
 
 
 def conv_dt(x: CDatetime) -> datetime | None:
-    return datetime(x.Year, x.Month, x.Day, x.Hour, x.Minute, x.Second, tzinfo=UTC) if x else None
+    if not x:
+        return None
+    return datetime(x.Year, x.Month, x.Day, x.Hour, x.Minute, x.Second, tzinfo=UTC)
 
 
 def conv_obj(x: Any) -> Any:

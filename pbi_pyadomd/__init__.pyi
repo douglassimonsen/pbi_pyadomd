@@ -1,8 +1,9 @@
-# ruff: noqa: N802, N999, PYI021
+# ruff: noqa: N802, PYI021
 
+from collections.abc import Iterator
 from enum import IntEnum
 from types import TracebackType
-from typing import Any, Iterator, NamedTuple, Self
+from typing import Any, NamedTuple, Self
 
 import bs4
 
@@ -35,7 +36,7 @@ class Description(NamedTuple):
     type_code: str
 
 class Reader:
-    _reader: "IDataReader"
+    _reader: IDataReader
 
     def read(self) -> bool: ...
     def read_outer_xml(self) -> str: ...
@@ -56,7 +57,7 @@ class Cursor:
     def close(self) -> None: ...
     def column_names(self) -> list[str]: ...
     def execute_xml(
-        self, query: str, query_name: str | None = None
+        self, query: str, query_name: str | None = None,
     ) -> bs4.BeautifulSoup: ...
     def execute_dax(self, query: str, query_name: str | None = None) -> Self: ...
     def fetch_stream(self) -> Iterator[dict[str, Any]]: ...
@@ -72,7 +73,7 @@ class Cursor:
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: "TracebackType | None",  # noqa: PYI036
+        traceback: TracebackType | None,
     ) -> None: ...
 
 class Pyadomd:
@@ -88,5 +89,5 @@ class Pyadomd:
         self,
         exc_type: type[BaseException] | None,
         exc_value: BaseException | None,
-        traceback: "TracebackType | None",  # noqa: PYI036
+        traceback: TracebackType | None,
     ) -> None: ...
