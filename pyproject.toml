@@ -3,8 +3,8 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "pyadomd"
-description = "Provides a python interface for communicating with an SSAS"
+name = "pbi_pyadomd"
+description = "Provides a python interface for communicating with an SSAS instance"
 readme = "README.md"
 requires-python = ">=3.11.0"
 dynamic = ["version"]

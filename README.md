@@ -6,7 +6,7 @@
 ```shell
 python -m venv venv
 venv\Scripts\activate
-python -m pip install .[dev]
+python -m pip install .
 ```
 
 

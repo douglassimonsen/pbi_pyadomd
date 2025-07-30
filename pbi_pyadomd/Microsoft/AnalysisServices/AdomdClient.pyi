@@ -50,3 +50,6 @@ class AdomdErrorResponseException(BaseException):
     Message: str
 
 class AdomdTransaction: ...
+
+class AdomdUnknownResponseException(BaseException):
+    Message: str
