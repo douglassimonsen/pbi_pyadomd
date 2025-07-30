@@ -158,21 +158,13 @@ class Cursor:
         )
         return dict(zip(column_names, data))
 
-    def fetch_many(self, size: int = 1) -> list[dict[str, Any]]:
-        """Fetches a fixed number of rows from the last executed query."""
-        ret: list[dict[str, Any]] = []
-        column_names = self.column_names()
-        try:
-            for _ in range(size):
-                ret.append(dict(zip(column_names, self.fetch_one_tuple())))
-        except StopIteration:
-            pass
-        return ret
-
-    def fetch_all(self) -> list[dict[str, Any]]:
+    def fetch_all(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Fetches all the rows from the last executed query."""
         # mypy issues with list comprehension :-(
-        return list(self.fetch_stream())
+        if limit is not None:
+            return [self.fetch_one() for _ in range(limit) if self._reader.Read()]
+        else:
+            return list(self.fetch_stream())
 
     @property
     def is_closed(self) -> bool:
