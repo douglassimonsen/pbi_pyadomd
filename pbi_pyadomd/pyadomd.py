@@ -101,7 +101,7 @@ class Reader:
 
 
 class Cursor:
-    reader: Reader
+    _reader: Reader
     _conn: AdomdConnection
 
     def __init__(self, connection: AdomdConnection) -> None:
@@ -111,7 +111,7 @@ class Cursor:
     def close(self) -> None:
         if self.is_closed:
             return
-        self.reader.close()
+        self._reader.close()
 
     def execute_xml(
         self, query: str, query_name: str | None = None,
@@ -135,11 +135,11 @@ class Cursor:
         query_name = query_name or ""
         logger.debug("execute XML query", query_name=query_name)
         self._cmd = AdomdCommand(query, self._conn)
-        self.reader = Reader(self._cmd.ExecuteXmlReader())
+        self._reader = Reader(self._cmd.ExecuteXmlReader())
         logger.debug("reading query", query_name=query_name)
-        lines = [self.reader.read_outer_xml()]
+        lines = [self._reader.read_outer_xml()]
         while lines[-1] != "":
-            lines.append(self.reader.read_outer_xml())
+            lines.append(self._reader.read_outer_xml())
         ret = bs4.BeautifulSoup("".join(lines), "xml")
         for node in ret.find_all():
             assert isinstance(node, bs4.element.Tag)
@@ -157,7 +157,7 @@ class Cursor:
         query_name = query_name or ""
         logger.debug("execute DAX query", query_name=query_name)
         self._cmd = AdomdCommand(query, self._conn)
-        self.reader = Reader(self._cmd.ExecuteReader())
+        self._reader = Reader(self._cmd.ExecuteReader())
 
         logger.debug("reading query", query_name=query_name)
 
@@ -165,7 +165,7 @@ class Cursor:
 
     def column_names(self) -> list[str]:
         """Returns the column names of the last executed query."""
-        return self.reader.column_names()
+        return self._reader.column_names()
 
     def fetch_stream(self) -> Iterator[dict[str, Any]]:
         """Fetches the rows from the last executed query as a stream of dictionaries.
@@ -176,7 +176,7 @@ class Cursor:
 
         """
         column_names = self.column_names()
-        while self.reader.read():
+        while self._reader.read():
             yield dict(zip(column_names, self.fetch_one_tuple(), strict=False))
 
     def fetch_one_tuple(self) -> tuple[Any, ...]:
@@ -186,7 +186,7 @@ class Cursor:
             Used internally for performance.
 
         """
-        return self.reader.get_row()
+        return self._reader.get_row()
 
     def fetch_one(self) -> dict[str, Any]:
         """Fetches a single row from the last executed query as a dictionary.
@@ -196,7 +196,7 @@ class Cursor:
 
         """
         column_names = self.column_names()
-        data = self.reader.get_row()
+        data = self._reader.get_row()
         return dict(zip(column_names, data, strict=False))
 
     def fetch_many(self, limit: int | None = None) -> list[dict[str, Any]]:
@@ -211,13 +211,13 @@ class Cursor:
         """
         # mypy issues with list comprehension :-(
         if limit is not None:
-            return [self.fetch_one() for _ in range(limit) if self.reader.read()]
+            return [self.fetch_one() for _ in range(limit) if self._reader.read()]
         return list(self.fetch_stream())
 
     @property
     def is_closed(self) -> bool:
         try:
-            state: bool = self.reader.is_closed
+            state: bool = self._reader.is_closed
         except AttributeError:
             return True
         return state
