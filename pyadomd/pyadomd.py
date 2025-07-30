@@ -13,7 +13,6 @@ limitations under the License.
 
 # mypy: ignore-errors
 from collections.abc import Iterator
-from enum import IntEnum
 from pathlib import Path
 from sys import path
 from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar
@@ -23,6 +22,7 @@ import clr  # type: ignore[import-untyped]
 import structlog
 
 from .c_sharp_type_mapping import adomd_type_map, convert
+from .Microsoft.AnalysisServices.enums import ConnectionState
 
 logger = structlog.get_logger()
 T = TypeVar("T")
@@ -34,6 +34,7 @@ from Microsoft.AnalysisServices.AdomdClient import (  # noqa: E402
     AdomdCommand,
     AdomdConnection,
     AdomdErrorResponseException,
+    AdomdUnknownResponseException,
 )
 
 if TYPE_CHECKING:
@@ -49,8 +50,58 @@ class Description(NamedTuple):
     type_code: str
 
 
-class Cursor:
+class Reader:
     _reader: "IDataReader"
+
+    def __init__(self, reader: "IDataReader") -> None:
+        self._reader = reader
+
+    def read(self) -> bool:
+        try:
+            return self._reader.Read()
+        except AdomdUnknownResponseException:
+            return False
+
+    def read_outer_xml(self) -> str:
+        return self._reader.ReadOuterXml()
+
+    def column_names(self) -> list[str]:
+        """Returns the column names of the last executed query."""
+        return [self._reader.GetName(i) for i in range(self.field_count)]
+
+    def descriptions(self) -> list[Description]:
+        return [
+            Description(
+                self._reader.GetName(i),
+                adomd_type_map[self._reader.GetFieldType(i).ToString()].type_name,
+            )
+            for i in range(self.field_count)
+        ]
+
+    def get_row(self) -> tuple[Any, ...]:
+        return tuple(
+            convert(
+                self._reader.GetFieldType(i).ToString(),
+                self._reader[i],
+                adomd_type_map,
+            )
+            for i in range(self.field_count)
+        )
+
+    @property
+    def field_count(self) -> int:
+        return self._reader.FieldCount
+
+    @property
+    def is_closed(self) -> bool:
+        return self._reader.IsClosed
+
+    def close(self) -> None:
+        self._reader.Close()
+
+
+class Cursor:
+    reader: Reader
     _conn: AdomdConnection
 
     def __init__(self, connection: AdomdConnection) -> None:
@@ -60,7 +111,7 @@ class Cursor:
     def close(self) -> None:
         if self.is_closed:
             return
-        self._reader.Close()
+        self.reader.close()
 
     def execute_xml(
         self, query: str, query_name: str | None = None
@@ -86,11 +137,11 @@ class Cursor:
         query_name = query_name or ""
         logger.debug("execute XML query", query_name=query_name)
         self._cmd = AdomdCommand(query, self._conn)
-        self._reader = self._cmd.ExecuteXmlReader()
+        self.reader = Reader(self._cmd.ExecuteXmlReader())
         logger.debug("reading query", query_name=query_name)
-        lines = [self._reader.ReadOuterXml()]
+        lines = [self.reader.read_outer_xml()]
         while lines[-1] != "":  # noqa: PLC1901
-            lines.append(self._reader.ReadOuterXml())
+            lines.append(self.reader.read_outer_xml())
         ret = bs4.BeautifulSoup("".join(lines), "xml")
         for node in ret.find_all():
             assert isinstance(node, bs4.element.Tag)
@@ -108,79 +159,47 @@ class Cursor:
         query_name = query_name or ""
         logger.debug("execute DAX query", query_name=query_name)
         self._cmd = AdomdCommand(query, self._conn)
-        self._reader = self._cmd.ExecuteReader()
-        self._field_count = self._reader.FieldCount
+        self.reader = Reader(self._cmd.ExecuteReader())
 
         logger.debug("reading query", query_name=query_name)
-        for i in range(self._field_count):
-            self._description.append(
-                Description(
-                    self._reader.GetName(i),
-                    adomd_type_map[self._reader.GetFieldType(i).ToString()].type_name,
-                ),
-            )
+
         return self
 
     def column_names(self) -> list[str]:
         """Returns the column names of the last executed query."""
-        return [self._reader.GetName(i) for i in range(self._field_count)]
+        return self.reader.column_names()
 
-    def fetch_stream(self, limit: int | None = None) -> Iterator[dict[str, Any]]:
+    def fetch_stream(self) -> Iterator[dict[str, Any]]:
         """Fetches the rows from the last executed query as a stream of dictionaries.
 
         Note:
         ----
-            This is important for subscribe queries that return a stream of data.
-
-        Note:
-        ----
-            You may need to close the reader after fetching the rows if:
-
-            1. You are using a explicit limit that is shorter than the total number of rows in the query result
-            2. You are tracing the command associated with the reader
-
-            This is because the trace will not create a query end record (since it assumes the client is still reading) without explicitly closing the reader. The reader can be closed with :code:`self._reader.Close()`
-        """
+            This is important for subscribe queries that return a stream of data."""
         column_names = self.column_names()
-        i = 0
-        while self._reader.Read():
-            if limit is not None and i >= limit:
-                break
-            i += 1
+        while self.reader.read():
             yield dict(zip(column_names, self.fetch_one_tuple()))
 
     def fetch_one_tuple(self) -> tuple[Any, ...]:
         """Fetches a single row from the last executed query as a tuple. Used internally for performance."""
-        return tuple(
-            convert(
-                self._reader.GetFieldType(i).ToString(),
-                self._reader[i],
-                adomd_type_map,
-            )
-            for i in range(self._field_count)
-        )
+        return self.reader.get_row()
 
     def fetch_one(self) -> dict[str, Any]:
         column_names = self.column_names()
-        data = tuple(
-            convert(
-                self._reader.GetFieldType(i).ToString(),
-                self._reader[i],
-                adomd_type_map,
-            )
-            for i in range(self._field_count)
-        )
+        data = self.reader.get_row()
         return dict(zip(column_names, data))
 
     def fetch_all(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Fetches all the rows from the last executed query."""
         # mypy issues with list comprehension :-(
-        return list(self.fetch_stream(limit=limit))
+        if limit is not None:
+            return [self.fetch_one() for _ in range(limit) if self.reader.read()]
+        else:
+            return list(self.fetch_stream())
 
     @property
     def is_closed(self) -> bool:
         try:
-            state: bool = self._reader.IsClosed
+            state: bool = self.reader.is_closed
         except AttributeError:
             return True
         return state
@@ -199,11 +218,6 @@ class Cursor:
         traceback: "TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
-
-
-class AdmomdState(IntEnum):
-    OPEN = 1
-    CLOSED = 0
 
 
 class Pyadomd:
@@ -229,12 +243,13 @@ class Pyadomd:
         return Cursor(self.conn)
 
     @property
-    def state(self) -> AdmomdState:
+    def state(self) -> ConnectionState:
         """1 = Open, 0 = Closed."""
-        return AdmomdState(self.conn.State)
+        return ConnectionState(self.conn.State.value__)
 
     def __enter__(self) -> Self:
-        self.open()
+        if self.state != ConnectionState.Open:
+            self.open()
         return self
 
     def __exit__(
