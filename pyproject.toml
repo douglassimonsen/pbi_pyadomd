@@ -27,9 +27,9 @@ path = "pbi_pyadomd/__init__.py"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
+  "ANN101",
   "ANN401",  # https://docs.astral.sh/ruff/rules/any-type/
   "CPY001",  # https://docs.astral.sh/ruff/rules/missing-copyright-notice/
-  "DOC201",  # https://docs.astral.sh/ruff/rules/docstring-missing-returns/
   "D100",    # https://docs.astral.sh/ruff/rules/undocumented-public-module/
   "D401",    # https://docs.astral.sh/ruff/rules/non-imperative-mood/
   "ERA001",  # https://docs.astral.sh/ruff/rules/commented-out-code/

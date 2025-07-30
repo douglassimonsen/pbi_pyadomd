@@ -15,89 +15,27 @@ limitations under the License.
 from collections.abc import Iterator
 from pathlib import Path
 from sys import path
-from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar
+from typing import TYPE_CHECKING, Any, Self, TypeVar
 
 import bs4
 import clr  # type: ignore[import-untyped]
 import structlog
 
-from .c_sharp_type_mapping import adomd_type_map, convert
-from .Microsoft.AnalysisServices.enums import ConnectionState
 from . import utils
+from .reader import Reader
+
 logger = structlog.get_logger()
 T = TypeVar("T")
-
 
 path.append(str(Path(__file__).parent)[2:])
 clr.AddReference("Microsoft.AnalysisServices.AdomdClient")  # pyright: ignore reportAttributeAccessIssue
 from Microsoft.AnalysisServices.AdomdClient import (  # noqa: E402
     AdomdCommand,
     AdomdConnection,
-    AdomdErrorResponseException,
-    AdomdUnknownResponseException,
 )
 
 if TYPE_CHECKING:
     from types import TracebackType
-
-    from Microsoft.AnalysisServices.AdomdClient import IDataReader
-
-__all__ = ["AdomdErrorResponseException"]
-
-
-class Description(NamedTuple):
-    name: str
-    type_code: str
-
-
-class Reader:
-    _reader: "IDataReader"
-
-    def __init__(self, reader: "IDataReader") -> None:
-        self._reader = reader
-
-    def read(self) -> bool:
-        try:
-            return self._reader.Read()
-        except AdomdUnknownResponseException:
-            return False
-
-    def read_outer_xml(self) -> str:
-        return self._reader.ReadOuterXml()
-
-    def column_names(self) -> list[str]:
-        """Returns the column names of the last executed query."""
-        return [self._reader.GetName(i) for i in range(self.field_count)]
-
-    def descriptions(self) -> list[Description]:
-        return [
-            Description(
-                self._reader.GetName(i),
-                adomd_type_map[self._reader.GetFieldType(i).ToString()].type_name,
-            )
-            for i in range(self.field_count)
-        ]
-
-    def get_row(self) -> tuple[Any, ...]:
-        return tuple(
-            convert(
-                self._reader.GetFieldType(i).ToString(),
-                self._reader[i],
-                adomd_type_map,
-            )
-            for i in range(self.field_count)
-        )
-
-    @property
-    def field_count(self) -> int:
-        return self._reader.FieldCount
-
-    @property
-    def is_closed(self) -> bool:
-        return self._reader.IsClosed
-
-    def close(self) -> None:
-        self._reader.Close()
 
 
 class Cursor:
@@ -109,18 +47,22 @@ class Cursor:
 
     def close(self) -> None:
         """Closes the underlying reader of the cursor.
-        
+
         Note:
-            If the reader is already closed or has not been initialized, this method does nothing.
+        ----
+            If the reader is already closed or has not been initialized, this
+            method does nothing.
+
         """
         if self.is_closed:
             return
         self._reader.close()
 
     def execute_xml(
-        self, query: str, query_name: str | None = None,
+        self,
+        query: str,
+        query_name: str | None = None,
     ) -> bs4.BeautifulSoup:
-
         query_name = query_name or ""
         logger.debug("execute XML query", query_name=query_name)
         self._cmd = AdomdCommand(query, self._conn)
@@ -163,10 +105,14 @@ class Cursor:
         ----
             You may need to close the reader after fetching the rows if:
 
-            1. You are using a explicit limit that is shorter than the total number of rows in the query result
+            1. You are using a explicit limit that is shorter than the total number of
+            rows in the query result
             2. You are tracing the command associated with the reader
 
-            This is because the trace will not create a query end record (since it assumes the client is still reading) without explicitly closing the reader. The reader can be closed with `self._reader.Close()`
+            This is because the trace will not create a query end record (since it
+            assumes the client is still reading) without explicitly closing the
+            reader. The reader can be closed with `self._reader.Close()`
+
         """
         column_names = self.column_names()
         while self._reader.read():
@@ -176,6 +122,7 @@ class Cursor:
         """Fetches a single row from the last executed query as a tuple.
 
         Note:
+        ----
             Used internally for performance.
 
         """
@@ -184,7 +131,8 @@ class Cursor:
     def fetch_one(self) -> dict[str, Any]:
         """Fetches a single row from the last executed query as a dictionary.
 
-        Returns:
+        Returns
+        -------
             dict[str, Any]: A dictionary representing the row, with column names as keys
 
         """
@@ -196,9 +144,11 @@ class Cursor:
         """Fetches multiple rows from the last executed query.
 
         Args:
+        ----
             limit (int | None): The number of rows to fetch. If None, fetches all rows.
 
         Returns:
+        -------
             list[dict[str, Any]]: A list of dictionaries representing the rows.
 
         """
@@ -210,9 +160,12 @@ class Cursor:
     @property
     def is_closed(self) -> bool:
         """Checks if the underlying reader is closed.
-        
+
         Note:
-            If the reader has not be initialized, it is considered closed."""
+        ----
+        If the reader has not be initialized, it is considered closed.
+
+        """
         try:
             state: bool = self._reader.is_closed
         except AttributeError:
@@ -220,47 +173,6 @@ class Cursor:
         return state
 
     def __enter__(self) -> Self:
-        return self
-
-    def __exit__(
-        self,
-        exc_type: type[BaseException] | None,
-        exc_value: BaseException | None,
-        traceback: "TracebackType | None",  # noqa: PYI036
-    ) -> None:
-        self.close()
-
-
-class Pyadomd:
-    def __init__(self, conn_str: str) -> None:
-        self.conn = AdomdConnection(conn_str)
-
-    def clone(self) -> "Pyadomd":
-        """Clones the connection."""
-        return Pyadomd(self.conn.ConnectionString)
-
-    def close(self) -> None:
-        """Closes the connection."""
-        self.conn.Close()
-        self.conn.Dispose()
-
-    def open(self) -> Self:
-        """Opens the connection."""
-        self.conn.Open()
-        return self
-
-    def cursor(self) -> Cursor:
-        """Creates a cursor object."""
-        return Cursor(self.conn)
-
-    @property
-    def state(self) -> ConnectionState:
-        """1 = Open, 0 = Closed."""
-        return ConnectionState(self.conn.State.value__)
-
-    def __enter__(self) -> Self:
-        if self.state != ConnectionState.Open:
-            self.open()
         return self
 
     def __exit__(
