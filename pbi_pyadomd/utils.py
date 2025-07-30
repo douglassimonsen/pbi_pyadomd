@@ -15,3 +15,6 @@ def _decode_name(name: str) -> str:
         if _is_encoded_char(e):
             name_parts[i] = chr(int(e[1:], 16))
     return "_".join(name_parts)
+
+
+__all__ = ["_decode_name"]

@@ -4,18 +4,28 @@ build-backend = "hatchling.build"
 
 [project]
 name = "pbi_pyadomd"
-description = "Provides a python interface for communicating with an SSAS instance"
+description = "A fork of pyadomd, providing a typed python interface for communicating with an SSAS instance"
 readme = "README.md"
 requires-python = ">=3.11.0"
 dynamic = ["version"]
 dependencies = [
   "pythonnet>=3.0.0",
   "structlog>=25.4.0",
+  "pythonnet>=3.0.3",       # clr in the code
+  "beautifulsoup4>=4.12.3",
 ]
 
 [project.optional-dependencies]
-dev = ["pre-commit>=3.8.0", "build>=1.2.2"]
-docs = ["pydata-sphinx-theme>=0.15.4", "sphinx-autobuild>=2024.9.17"]
+dev = [
+  "pre-commit>=3.8.0",
+  "build>=1.2.2",
+  "ruff>=0.12.7",
+]
+docs = [
+  "mkdocs>=1.6.1",
+  "mkdocs-material>=9.6.16",
+  "mkdocstrings-python>=0.30.0",
+]
 
 [tool.doc8]
 max-line-length = 120
@@ -27,7 +37,6 @@ path = "pbi_pyadomd/__init__.py"
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-  "ANN101",
   "ANN401",  # https://docs.astral.sh/ruff/rules/any-type/
   "CPY001",  # https://docs.astral.sh/ruff/rules/missing-copyright-notice/
   "D100",    # https://docs.astral.sh/ruff/rules/undocumented-public-module/
