@@ -4,3 +4,4 @@ dist
 __pycache__
 venv
 docs/build
+docs/site
