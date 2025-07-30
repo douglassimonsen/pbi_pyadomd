@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pyadomd"
+description = "Provides a python interface for communicating with an SSAS"
+readme = "README.md"
+requires-python = ">=3.11.0"
+dynamic = ["version"]
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pre-commit>=3.8.0", "build>=1.2.2"]
+
+[tool.doc8]
+max-line-length = 120
+file-encoding = "utf8"
+
+[tool.hatch.version]
+path = "pyadomd/__init__.py"
