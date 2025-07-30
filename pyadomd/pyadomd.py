@@ -121,16 +121,22 @@ class Cursor:
             )
         return self
 
-    def fetch_stream(self) -> Iterator[tuple[Any, ...]]:
-        while self._reader.Read():
-            yield self.fetchone()
+    def column_names(self) -> list[str]:
+        """Returns the column names of the last executed query."""
+        return [self._reader.GetName(i) for i in range(self._field_count)]
 
-    def fetch_stream_dict(self) -> Iterator[dict[str, Any]]:
-        column_names = [self._reader.GetName(i) for i in range(self._field_count)]
-        while self._reader.Read():
-            yield dict(zip(column_names, self.fetchone()))
+    def fetch_stream(self) -> Iterator[dict[str, Any]]:
+        """Fetches the rows from the last executed query as a stream of dictionaries.
 
-    def fetchone(self) -> tuple[Any, ...]:
+        Note:
+        ----
+            This is important for subscribe queries that return a stream of data."""
+        column_names = self.column_names()
+        while self._reader.Read():
+            yield dict(zip(column_names, self.fetch_one_tuple()))
+
+    def fetch_one_tuple(self) -> tuple[Any, ...]:
+        """Fetches a single row from the last executed query as a tuple. Used internally for performance."""
         return tuple(
             convert(
                 self._reader.GetFieldType(i).ToString(),
@@ -140,16 +146,30 @@ class Cursor:
             for i in range(self._field_count)
         )
 
-    def fetchmany(self, size: int = 1) -> list[tuple[Any, ...]]:
-        ret: list[tuple[Any, ...]] = []
+    def fetch_one(self) -> dict[str, Any]:
+        column_names = self.column_names()
+        data = tuple(
+            convert(
+                self._reader.GetFieldType(i).ToString(),
+                self._reader[i],
+                adomd_type_map,
+            )
+            for i in range(self._field_count)
+        )
+        return dict(zip(column_names, data))
+
+    def fetch_many(self, size: int = 1) -> list[dict[str, Any]]:
+        """Fetches a fixed number of rows from the last executed query."""
+        ret: list[dict[str, Any]] = []
+        column_names = self.column_names()
         try:
             for _ in range(size):
-                ret.append(self.fetchone())
+                ret.append(dict(zip(column_names, self.fetch_one_tuple())))
         except StopIteration:
             pass
         return ret
 
-    def fetchall(self) -> list[tuple[Any, ...]]:
+    def fetch_all(self) -> list[dict[str, Any]]:
         """Fetches all the rows from the last executed query."""
         # mypy issues with list comprehension :-(
         return list(self.fetch_stream())
