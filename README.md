@@ -4,6 +4,11 @@ pbi_pyadomd is a fork of the original [pyadomd](https://pypi.org/project/pyadomd
 
 For more information, see the [docs](https://douglassimonsen.github.io/pbi_pyadomd/)
 
+# Installation
+
+```shell
+python -m pip install pbi_pyadomd
+```
 # Dev Instructions
 
 
