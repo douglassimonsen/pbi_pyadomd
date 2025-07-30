@@ -125,14 +125,28 @@ class Cursor:
         """Returns the column names of the last executed query."""
         return [self._reader.GetName(i) for i in range(self._field_count)]
 
-    def fetch_stream(self) -> Iterator[dict[str, Any]]:
+    def fetch_stream(self, limit: int | None = None) -> Iterator[dict[str, Any]]:
         """Fetches the rows from the last executed query as a stream of dictionaries.
 
         Note:
         ----
-            This is important for subscribe queries that return a stream of data."""
+            This is important for subscribe queries that return a stream of data.
+
+        Note:
+        ----
+            You may need to close the reader after fetching the rows if:
+
+            1. You are using a explicit limit that is shorter than the total number of rows in the query result
+            2. You are tracing the command associated with the reader
+
+            This is because the trace will not create a query end record (since it assumes the client is still reading) without explicitly closing the reader. The reader can be closed with :code:`self._reader.Close()`
+        """
         column_names = self.column_names()
+        i = 0
         while self._reader.Read():
+            if limit is not None and i >= limit:
+                break
+            i += 1
             yield dict(zip(column_names, self.fetch_one_tuple()))
 
     def fetch_one_tuple(self) -> tuple[Any, ...]:
@@ -161,10 +175,7 @@ class Cursor:
     def fetch_all(self, limit: int | None = None) -> list[dict[str, Any]]:
         """Fetches all the rows from the last executed query."""
         # mypy issues with list comprehension :-(
-        if limit is not None:
-            return [self.fetch_one() for _ in range(limit) if self._reader.Read()]
-        else:
-            return list(self.fetch_stream())
+        return list(self.fetch_stream(limit=limit))
 
     @property
     def is_closed(self) -> bool:

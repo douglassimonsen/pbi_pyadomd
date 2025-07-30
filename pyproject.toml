@@ -8,10 +8,14 @@ description = "Provides a python interface for communicating with an SSAS"
 readme = "README.md"
 requires-python = ">=3.11.0"
 dynamic = ["version"]
-dependencies = []
+dependencies = [
+  "pythonnet>=3.0.0",
+  "structlog",
+]
 
 [project.optional-dependencies]
 dev = ["pre-commit>=3.8.0", "build>=1.2.2"]
+docs = ["pydata-sphinx-theme>=0.15.4", "sphinx-autobuild>=2024.9.17"]
 
 [tool.doc8]
 max-line-length = 120
