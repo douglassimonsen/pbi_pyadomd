@@ -65,15 +65,21 @@ class Cursor:
     def execute_xml(
         self, query: str, query_name: str | None = None
     ) -> bs4.BeautifulSoup:
+        def _is_encoded_char(val: str) -> bool:
+            UTF_ENCODED_LEN = 5  # noqa: N806
+            start, body = val[0], val[1:]
+            if (
+                len(val) == UTF_ENCODED_LEN
+                and start == "x"
+                and all(c in "0123456789ABCDEF" for c in body)
+            ):
+                return True
+            return False
+
         def _clean_name(name: str) -> str:
             name_parts = name.split("_")
-            UTF_ENCODED_LEN = 5  # noqa: N806
             for i, e in enumerate(name_parts):
-                if (
-                    len(e) == UTF_ENCODED_LEN
-                    and e[0] == "x"
-                    and all(c in "0123456789ABCDEF" for c in e[1:])
-                ):
+                if _is_encoded_char(e):
                     name_parts[i] = chr(int(e[1:], 16))
             return "_".join(name_parts)
 
@@ -90,6 +96,13 @@ class Cursor:
             assert isinstance(node, bs4.element.Tag)
             node.name = _clean_name(node.name)
         return ret
+
+    def execute_non_query(self, query: str, query_name: str | None = None) -> Self:
+        query_name = query_name or ""
+        logger.debug("execute DAX query", query_name=query_name)
+        self._cmd = AdomdCommand(query, self._conn)
+        self._cmd.ExecuteNonQuery()
+        return self
 
     def execute_dax(self, query: str, query_name: str | None = None) -> Self:
         query_name = query_name or ""
@@ -171,9 +184,10 @@ class Pyadomd:
         self.conn.Close()
         self.conn.Dispose()
 
-    def open(self) -> None:
+    def open(self) -> Self:
         """Opens the connection."""
         self.conn.Open()
+        return self
 
     def cursor(self) -> Cursor:
         """Creates a cursor object."""
