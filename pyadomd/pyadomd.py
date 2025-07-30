@@ -121,22 +121,30 @@ class Cursor:
             )
         return self
 
-    def fetchone(self) -> Iterator[tuple[Any, ...]]:
+    def fetch_stream(self) -> Iterator[tuple[Any, ...]]:
         while self._reader.Read():
-            yield tuple(
-                convert(
-                    self._reader.GetFieldType(i).ToString(),
-                    self._reader[i],
-                    adomd_type_map,
-                )
-                for i in range(self._field_count)
+            yield self.fetchone()
+
+    def fetch_stream_dict(self) -> Iterator[dict[str, Any]]:
+        column_names = [self._reader.GetName(i) for i in range(self._field_count)]
+        while self._reader.Read():
+            yield dict(zip(column_names, self.fetchone()))
+
+    def fetchone(self) -> tuple[Any, ...]:
+        return tuple(
+            convert(
+                self._reader.GetFieldType(i).ToString(),
+                self._reader[i],
+                adomd_type_map,
             )
+            for i in range(self._field_count)
+        )
 
     def fetchmany(self, size: int = 1) -> list[tuple[Any, ...]]:
         ret: list[tuple[Any, ...]] = []
         try:
             for _ in range(size):
-                ret.append(next(self.fetchone()))  # noqa: PERF401
+                ret.append(self.fetchone())
         except StopIteration:
             pass
         return ret
@@ -144,7 +152,7 @@ class Cursor:
     def fetchall(self) -> list[tuple[Any, ...]]:
         """Fetches all the rows from the last executed query."""
         # mypy issues with list comprehension :-(
-        return list(self.fetchone())
+        return list(self.fetch_stream())
 
     @property
     def is_closed(self) -> bool:
@@ -178,6 +186,10 @@ class AdmomdState(IntEnum):
 class Pyadomd:
     def __init__(self, conn_str: str) -> None:
         self.conn = AdomdConnection(conn_str)
+
+    def clone(self) -> "Pyadomd":
+        """Clones the connection."""
+        return Pyadomd(self.conn.ConnectionString)
 
     def close(self) -> None:
         """Closes the connection."""
