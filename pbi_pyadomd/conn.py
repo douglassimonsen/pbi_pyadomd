@@ -107,6 +107,12 @@ class Connection:
         return ret
 
     def execute_non_query(self, query: str, query_name: str | None = None) -> Self:
+        """Executes a non-query DAX command.
+
+        Returns:
+            Self: The connection object itself for method chaining.
+
+        """
         query_name = query_name or ""
         logger.debug("execute DAX query", query_name=query_name)
         cmd = AdomdCommand(query, self.conn)
@@ -114,6 +120,16 @@ class Connection:
         return self
 
     def execute_dax(self, query: str, query_name: str | None = None) -> Reader:
+        """Executes a DAX query and returns a Reader object.
+
+        Args:
+            query (str): The DAX query to execute.
+            query_name (str | None): Optional name for the query, used for logging.
+
+        Returns:
+            Reader: A Reader object to read the results of the query.
+
+        """
         query_name = query_name or ""
         logger.debug("execute DAX query", query_name=query_name)
         cmd = AdomdCommand(query, self.conn)
