@@ -22,4 +22,4 @@ max-line-length = 120
 file-encoding = "utf8"
 
 [tool.hatch.version]
-path = "pyadomd/__init__.py"
+path = "pbi_pyadomd/__init__.py"
