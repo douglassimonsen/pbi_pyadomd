@@ -1,6 +1,6 @@
 # Overview
 
-Pbi_pyadomd is a fork of the original [pyadomd](https://pypi.org/project/pyadomd/) library, designed to provide a typed Python interface for communicating with SQL Server Analysis Services (SSAS) instances. This library allows developers to execute DAX and XML queries against SSAS in a more structured and type-safe manner.
+Pbi_pyadomd is a fork of the original [pyadomd](https://pypi.org/project/pyadomd/) library, designed to provide a typed Python interface for communicating with SQL Server Analysis Services (SSAS) instances. This library allows developers to execute DAX and XML queries against SSAS in a more structured and type-safe manner. It also includes the ability to stream results from long-running queries, such as those used in SSAS Trace subscriptions.
 
 # Installation
 
