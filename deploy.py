@@ -1,4 +1,4 @@
-import importlib.metadata
+import importlib
 import subprocess
 import sys
 
@@ -7,7 +7,7 @@ import git
 import github
 
 PACKAGE_NAME = "pbi_pyadomd"
-version = importlib.metadata.version(PACKAGE_NAME)
+version = importlib.import_module(PACKAGE_NAME).__version__
 
 
 def create_release() -> None:
