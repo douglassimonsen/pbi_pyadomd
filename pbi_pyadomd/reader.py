@@ -75,11 +75,24 @@ class Reader:
             for i in range(self.field_count)
         ]
 
+    def fetch_many(self, limit: int | None = None) -> list[dict[str, Any]]:
+        """Fetches multiple rows from the last executed query.
+
+        Args:
+            limit (int | None): The number of rows to fetch. If None, fetches all rows.
+
+        Returns:
+            list[dict[str, Any]]: A list of dictionaries representing the rows.
+
+        """
+        if limit is not None:
+            return [self.fetch_one() for _ in range(limit) if self.read()]
+        return list(self.fetch_stream())
+
     def fetch_one(self) -> dict[str, Any]:
         """Fetches a single row from the last executed query as a dictionary.
 
-        Returns
-        -------
+        Returns:
             dict[str, Any]: A dictionary representing the row, with column names as keys
 
         """
@@ -104,25 +117,10 @@ class Reader:
             for i in range(self.field_count)
         )
 
-    def fetch_many(self, limit: int | None = None) -> list[dict[str, Any]]:
-        """Fetches multiple rows from the last executed query.
-
-        Args:
-            limit (int | None): The number of rows to fetch. If None, fetches all rows.
-
-        Returns:
-            list[dict[str, Any]]: A list of dictionaries representing the rows.
-
-        """
-        if limit is not None:
-            return [self.fetch_one() for _ in range(limit) if self.read()]
-        return list(self.fetch_stream())
-
     def fetch_stream(self) -> Iterator[dict[str, Any]]:
         """Fetches the rows from the last executed query as a stream of dictionaries.
 
         Note:
-        ----
             You may need to close the reader after fetching the rows if:
 
             1. You are using a explicit limit that is shorter than the total number of

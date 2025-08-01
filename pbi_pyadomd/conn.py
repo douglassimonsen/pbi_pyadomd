@@ -53,25 +53,6 @@ class Connection:
     def __init__(self, conn_str: str) -> None:
         self.conn = AdomdConnection(conn_str)
 
-    def clone(self) -> "Connection":
-        """Clones the connection."""
-        return Connection(self.conn.ConnectionString)
-
-    def close(self) -> None:
-        """Closes the connection."""
-        self.conn.Close()
-        self.conn.Dispose()
-
-    def open(self) -> Self:
-        """Opens the connection."""
-        self.conn.Open()
-        return self
-
-    @property
-    def state(self) -> ConnectionState:
-        """1 = Open, 0 = Closed."""
-        return ConnectionState(self.conn.State.value__)
-
     def __enter__(self) -> Self:
         if self.state != ConnectionState.Open:
             self.open()
@@ -84,6 +65,44 @@ class Connection:
         traceback: "TracebackType | None",  # noqa: PYI036
     ) -> None:
         self.close()
+
+    def clone(self) -> "Connection":
+        """Clones the connection."""
+        return Connection(self.conn.ConnectionString)
+
+    def close(self) -> None:
+        """Closes the connection."""
+        self.conn.Close()
+        self.conn.Dispose()
+
+    def execute_dax(self, query: str, query_name: str | None = None) -> Reader:
+        """Executes a DAX query and returns a Reader object.
+
+        Args:
+            query (str): The DAX query to execute.
+            query_name (str | None): Optional name for the query, used for logging.
+
+        Returns:
+            Reader: A Reader object to read the results of the query.
+
+        """
+        query_name = query_name or ""
+        logger.debug("execute DAX query", query_name=query_name)
+        cmd = AdomdCommand(query, self.conn)
+        return Reader(cmd.ExecuteReader())
+
+    def execute_non_query(self, query: str, query_name: str | None = None) -> Self:
+        """Executes a non-query DAX command.
+
+        Returns:
+            Self: The connection object itself for method chaining.
+
+        """
+        query_name = query_name or ""
+        logger.debug("execute DAX query", query_name=query_name)
+        cmd = AdomdCommand(query, self.conn)
+        cmd.ExecuteNonQuery()
+        return self
 
     def execute_xml(
         self,
@@ -106,34 +125,15 @@ class Connection:
 
         return ret
 
-    def execute_non_query(self, query: str, query_name: str | None = None) -> Self:
-        """Executes a non-query DAX command.
-
-        Returns:
-            Self: The connection object itself for method chaining.
-
-        """
-        query_name = query_name or ""
-        logger.debug("execute DAX query", query_name=query_name)
-        cmd = AdomdCommand(query, self.conn)
-        cmd.ExecuteNonQuery()
+    def open(self) -> Self:
+        """Opens the connection."""
+        self.conn.Open()
         return self
 
-    def execute_dax(self, query: str, query_name: str | None = None) -> Reader:
-        """Executes a DAX query and returns a Reader object.
-
-        Args:
-            query (str): The DAX query to execute.
-            query_name (str | None): Optional name for the query, used for logging.
-
-        Returns:
-            Reader: A Reader object to read the results of the query.
-
-        """
-        query_name = query_name or ""
-        logger.debug("execute DAX query", query_name=query_name)
-        cmd = AdomdCommand(query, self.conn)
-        return Reader(cmd.ExecuteReader())
+    @property
+    def state(self) -> ConnectionState:
+        """1 = Open, 0 = Closed."""
+        return ConnectionState(self.conn.State.value__)
 
 
 def connect(conn_str: str) -> Connection:
