@@ -20,6 +20,10 @@ dev = [
   "pre-commit>=3.8.0",
   "build>=1.2.2",
   "ruff>=0.12.7",
+
+  "PyGithub>=2.7.0",
+  "git-python>=1.0.3",
+  "dotenv>=0.9.9",
 ]
 docs = [
   "mkdocs>=1.6.1",
