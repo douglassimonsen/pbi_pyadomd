@@ -17,7 +17,7 @@ from pathlib import Path
 from sys import path
 from typing import TYPE_CHECKING, Any, NamedTuple
 
-import clr
+import clr  # type: ignore[import-untyped]
 import structlog
 
 from .c_sharp_type_mapping import adomd_type_map, convert

@@ -20,7 +20,7 @@ import bs4
 import clr  # type: ignore[import-untyped]
 import structlog
 
-from . import utils
+from . import utils, xml_error_handling
 from .Microsoft.AnalysisServices.enums import ConnectionState
 from .reader import Reader
 
@@ -123,6 +123,7 @@ class Connection:
                 assert isinstance(node, bs4.element.Tag)
                 node.name = utils._decode_name(node.name)
 
+        self._check_errors(ret)
         return ret
 
     def open(self) -> Self:
@@ -134,6 +135,10 @@ class Connection:
     def state(self) -> ConnectionState:
         """1 = Open, 0 = Closed."""
         return ConnectionState(self.conn.State.value__)
+
+    @staticmethod
+    def _check_errors(xml: bs4.BeautifulSoup) -> None:
+        xml_error_handling.check_errors(xml)
 
 
 def connect(conn_str: str) -> Connection:
