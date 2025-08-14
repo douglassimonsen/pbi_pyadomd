@@ -131,6 +131,10 @@ class Reader:
             assumes the client is still reading) without explicitly closing the
             reader. The reader can be closed with `self._reader.Close()`
 
+        Returns:
+            Iterator[dict[str, Any]]: An iterator over the rows, represented as
+                dictionaries.
+
         """
         column_names = self.column_names()
         while self.read():
