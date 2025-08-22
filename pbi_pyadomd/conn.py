@@ -47,8 +47,6 @@ if TYPE_CHECKING:
 class Connection:
     conn: AdomdConnection
     """The underlying C# AdomdConnection object."""
-    reader: Reader
-    """The python reader for the connection, used to execute queries."""
 
     def __init__(self, conn_str: str) -> None:
         self.conn = AdomdConnection(conn_str)
