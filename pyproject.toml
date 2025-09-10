@@ -27,6 +27,10 @@ docs = [
   "mkdocstrings-python>=0.30.0",
 ]
 
+[project.urls]
+Homepage = "https://github.com/douglassimonsen/pbi_pyadomd"
+Documentation = "https://douglassimonsen.github.io/pbi_pyadomd/"
+
 [tool.doc8]
 max-line-length = 120
 file-encoding = "utf8"
